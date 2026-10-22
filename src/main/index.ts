@@ -15,6 +15,7 @@ import { SendCoordinator } from './send/coordinator'
 import { FcmAdapter } from './push/fcm/adapter'
 import { ApnsAdapter } from './push/apns/adapter'
 import { channel } from '../shared/channels'
+import { requestRendererFlush } from './renderer-flush'
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 const requestedData=app.commandLine.getSwitchValue('user-data-dir')
 if(requestedData)app.setPath('userData',path.resolve(requestedData))
@@ -33,8 +34,9 @@ const coordinator=new SendCoordinator({store,configService,history,tokenService,
 configService.onInvalidate=async id=>{await Promise.all([fcm.invalidate(id),apns.invalidate(id)])}
 coordinator.onUpdate(receipt=>{if(!window.isDestroyed())window.webContents.send(channel('sendUpdate'),receipt)})
 registerIpc({window,ipcMain,store,configService,tokenService,send:input=>coordinator.send(input),allowedOrigin:rendererUrl()||'app://pusher'})
-app.on('before-quit',()=>{void apns.close()})
-installShutdownFlush(app,()=>store.flush(),()=>{window.show();dialog.showErrorBox('保存未完成','本地数据保存失败，请检查系统加密状态和文件权限后重试关闭。')})
+let allowClose=false
+window.on('close',event=>{if(!allowClose){event.preventDefault();app.quit()}})
+installShutdownFlush(app,async()=>{await requestRendererFlush(window,ipcMain,rendererUrl()||'app://pusher');await store.flush();await apns.close();allowClose=true},error=>{window.show();if(!(error instanceof Error&&error.message==='CLOSE_CANCELLED'))dialog.showErrorBox('保存未完成','草稿尚未保存或窗口未响应，请检查后重试关闭。')})
 app.on('window-all-closed', () => app.quit())
 
 }).catch(()=>dialog.showErrorBox('启动失败','Pusher 未能完成初始化，请重新启动。'))

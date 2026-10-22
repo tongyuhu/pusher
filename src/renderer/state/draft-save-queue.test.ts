@@ -1,0 +1,6 @@
+import { afterEach,expect,it,vi } from 'vitest'
+import { DraftSaveQueue } from './draft-save-queue'
+import { createDraft } from '../../shared/message/draft'
+afterEach(()=>vi.useRealTimers())
+it('500ms 合并写入，旧版本不能覆盖新版，退出刷新无需等 debounce',async()=>{vi.useFakeTimers();const writes:number[]=[];const q=new DraftSaveQueue(async d=>{writes.push(d.revision)});const d=createDraft('ios');q.enqueue({...d,revision:1});q.enqueue({...d,revision:3});q.enqueue({...d,revision:2});await vi.advanceTimersByTimeAsync(499);expect(writes).toEqual([]);await q.flush();expect(writes).toEqual([3]);q.enqueue({...d,revision:4});await vi.advanceTimersByTimeAsync(500);await q.flush();expect(writes).toEqual([3,4])})
+it('慢写入期间的新草稿最终被保存，失败后可重试',async()=>{let release!:()=>void,first=true;const writes:number[]=[];const q=new DraftSaveQueue(async d=>{if(first){first=false;await new Promise<void>(r=>release=r)}writes.push(d.revision)});const d=createDraft('android');q.enqueue({...d,revision:1});const f=q.flush();await Promise.resolve();q.enqueue({...d,revision:2});release();await f;expect(writes).toEqual([1,2]);let fail=true;const q2=new DraftSaveQueue(async()=>{if(fail)throw Error('disk')});q2.enqueue({...d,revision:5});await expect(q2.flush()).rejects.toThrow('disk');fail=false;await expect(q2.flush()).resolves.toBeUndefined()})

@@ -8,12 +8,7 @@ api.onSendUpdate = (listener: (receipt: SendReceipt) => void) => {
   ipcRenderer.on(channel('sendUpdate'), wrapped)
   return () => ipcRenderer.removeListener(channel('sendUpdate'), wrapped)
 }
-api.onBeforeClose = (listener: () => Promise<void>) => {
-  const wrapped = async (_event: unknown, nonce: string) => {
-    try { await listener(); ipcRenderer.send(channel('flushAck'), { nonce, ok: true }) }
-    catch { ipcRenderer.send(channel('flushAck'), { nonce, ok: false }) }
-  }
-  ipcRenderer.on(channel('flush'), wrapped)
-  return () => ipcRenderer.removeListener(channel('flush'), wrapped)
-}
+const closeListeners=new Set<()=>Promise<void>>()
+ipcRenderer.on(channel('flush'),async(_event,nonce:string)=>{try{await Promise.all([...closeListeners].map(listener=>listener()));ipcRenderer.send(channel('flushAck'),{nonce,ok:true})}catch{ipcRenderer.send(channel('flushAck'),{nonce,ok:false})}})
+api.onBeforeClose=(listener:()=>Promise<void>)=>{closeListeners.add(listener);return ()=>closeListeners.delete(listener)}
 contextBridge.exposeInMainWorld('pusher', api as unknown as PusherApi)

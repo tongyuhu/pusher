@@ -36,7 +36,7 @@ export class SendCoordinator {
       const timeout=new Promise<ProviderOutcome>(resolve=>{timer=setTimeout(()=>{controller.abort();resolve({status:'unknown',providerCode:'TIMEOUT',detail:'请求超过 30 秒，无法确认发送状态，请核对设备后决定是否重试。'})},30000)})
       const sending=this.services.adapters[input.scope.platform].send({snapshot,resolved:resolved.value,payload:payload.value},controller.signal).catch(():ProviderOutcome=>({status:'unknown',providerCode:'UNEXPECTED_ERROR',detail:'发送未正常结束，无法确认请求状态。'}))
       const outcome=await Promise.race([sending,timeout]);if(timer)clearTimeout(timer)
-      const secret=resolved.value.credential,secrets=[snapshot.token,secret.privateKey,...(secret.kind==='apns-p12'?[secret.password,secret.originalBase64]:[])]
+      const secret=resolved.value.credential,secrets=[snapshot.token,...(secret.kind==='apns-p12'?[secret.password,secret.originalBase64]:[secret.privateKey])]
       const receipt:SendReceipt={snapshot,...outcome,elapsedMs:Date.now()-start,persisted:true,detail:outcome.detail?redact(outcome.detail,secrets).slice(0,8192):undefined,providerCode:outcome.providerCode?redact(outcome.providerCode,secrets).slice(0,120):undefined,providerId:outcome.providerId?redact(outcome.providerId,secrets):undefined}
       try{await this.services.history.finish(receipt)}catch{receipt.persisted=false}
       if(['UNREGISTERED','Unregistered','BadDeviceToken'].includes(receipt.providerCode||''))await this.services.tokenService.markInvalid(input.scope,input.token,receipt.providerCode!).catch(()=>{})

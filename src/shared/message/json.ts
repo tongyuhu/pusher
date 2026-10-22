@@ -23,6 +23,12 @@ export function parsePayload(raw: string): Result<JsonObject> {
   }
 }
 export function validatePayload(draft: Draft): Result<JsonObject> {
+  if(draft.mode==='form'&&draft.messageType!=='notification'&&typeof draft.formStash.dataEditorText==='string'){
+    const data=parsePayload(draft.formStash.dataEditorText)
+    if(!data.ok)return fail('INVALID_DATA_JSON','自定义数据 JSON 格式错误，请修复后发送','data')
+    if(draft.platform==='ios'&&'aps' in data.value)return fail('RESERVED_APS','自定义数据不能覆盖 aps','data')
+    if(draft.platform==='android'&&Object.values(data.value).some(v=>typeof v!=='string'))return fail('INVALID_DATA','FCM 自定义数据的值必须是字符串','data')
+  }
   const parsed=parsePayload(draft.rawText)
   if (!parsed.ok) return parsed
   return draft.platform==='android' ? validateFcm(parsed.value) : validateApns(parsed.value,draft.advanced)

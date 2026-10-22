@@ -22,7 +22,7 @@ export class ApnsAdapter implements PushAdapter {
       }else if(c.kind!=='apns-p12')throw Error('INVALID_CREDENTIAL')
     }catch{return {status:'not-sent',providerCode:'AUTH_FAILED',detail:'APNs 签名失败，请检查密钥、Key ID 与 Team ID。'}}
     try{
-      const response=await (this.transport||new Http2Transport(this.connections,ctx.resolved)).request({url:`https://${scope.environment==='test'?'api.sandbox.push.apple.com':'api.push.apple.com'}/3/device/${ctx.snapshot.token}`,method:'POST',headers,body:Buffer.from(JSON.stringify(ctx.payload)),...(c.kind==='apns-p12'?{tls:{key:c.privateKey,cert:c.certificate+'\n'+c.chain}}:{})},signal)
+      const response=await (this.transport||new Http2Transport(this.connections,ctx.resolved)).request({url:`https://${scope.environment==='test'?'api.sandbox.push.apple.com':'api.push.apple.com'}/3/device/${ctx.snapshot.token}`,method:'POST',headers,body:Buffer.from(JSON.stringify(ctx.payload)),...(c.kind==='apns-p12'?{tls:{pfx:Buffer.from(c.originalBase64,'base64'),passphrase:c.password}}:{})},signal)
       const hide=(s:string)=>token?s.replaceAll(token,'[已隐藏]'):s
       if(response.status===200)return {status:'accepted',httpStatus:200,providerId:hide(response.headers['apns-id']||''),detail:'APNs 已接受请求，设备接收情况需在 App 中确认。'}
       let body:any;try{body=JSON.parse(response.body)}catch{}
