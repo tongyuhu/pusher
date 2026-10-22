@@ -8,6 +8,9 @@ dist-electron/
 out/
 release/
 coverage/
+*.tsbuildinfo
+test-results/
+playwright-report/
 *.log
 
 # 本地环境和推送凭据
