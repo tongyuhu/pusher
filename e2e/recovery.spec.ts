@@ -21,7 +21,7 @@ test('实际 Electron 可以导入 p8 和带密码的 p12', async () => {
       { p8: p8File, p12: p12File },
     )
     const page = await app.firstWindow()
-    await page.getByRole('link', { name: '⚙ 设置' }).click()
+    await page.getByRole('link', { name: '设置', exact: true }).click()
     await page.getByRole('tab', { name: 'iOS 推送' }).click()
     await page.getByLabel('Bundle ID').fill('com.example.pusher')
     await page.getByLabel('Key ID').fill('KEY1234567')

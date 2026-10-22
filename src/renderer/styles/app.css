@@ -6,7 +6,7 @@
 }
 .brand-icon {
   margin: auto;
-  background: var(--accent);
+  background: linear-gradient(145deg, #6478f0, #4659ce);
   color: white;
   border-radius: 14px;
   width: 50px;
@@ -403,6 +403,9 @@ textarea.control {
   display: flex;
   align-items: center;
 }
+.token-select {
+  position: relative;
+}
 .token-input-row input {
   padding-right: 42px;
   font-size: 11px;
@@ -419,31 +422,123 @@ textarea.control {
   border-left: 1px solid var(--border);
   border-radius: 0 6px 6px 0;
 }
-.token-tools {
+.lucide {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.with-icon,
+.text-button,
+.settings-link,
+.back-link,
+.preview-toggle,
+.platform-switch button,
+.send-button,
+.page-header > .primary,
+.settings-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.settings-nav button {
+  justify-content: flex-start;
+}
+.token-summary {
   display: flex;
   align-items: center;
-  gap: 13px;
-  margin-top: 9px;
+  gap: 10px;
 }
-.token-tools input {
-  border: 0;
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #7889a3;
   background: transparent;
-  outline: none;
-  min-width: 0;
-  flex: 1;
-  font-size: 10px;
-  color: #7586a0;
-  padding: 3px 0;
+  flex-shrink: 0;
 }
-.token-tools input::placeholder {
-  color: #aab3c3;
+.icon-button:hover:not(:disabled) {
+  color: var(--accent);
+  background: #edf2ff;
+}
+.icon-button.danger:hover {
+  color: #c74c5c;
+  background: #fff0f2;
+}
+.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dropdown-button {
+  display: grid;
+  place-items: center;
+}
+.device-name-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+.device-name-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+  font-size: 12px;
+  color: #60708b;
+}
+.device-name-field input.control {
+  padding: 9px 11px;
+  font-size: 12px;
+}
+.save-device {
+  min-height: 36px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.token-search {
+  position: relative;
+  margin-bottom: 7px;
+}
+.token-search > svg {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: #8e9bb0;
+}
+.token-search > .control {
+  font-size: 12px;
+  padding: 8px 10px 8px 33px;
+}
+.spin {
+  animation: icon-spin 1.2s linear infinite;
+}
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
 }
 .token-menu {
   position: absolute;
   z-index: 10;
   left: 0;
   right: 0;
-  top: 65px;
+  top: calc(100% + 6px);
   background: white;
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -451,11 +546,6 @@ textarea.control {
   box-shadow: 0 10px 35px #172b4f20;
   max-height: 260px;
   overflow-y: auto;
-}
-.token-menu > .control {
-  font-size: 11px;
-  padding: 8px 10px;
-  margin-bottom: 5px;
 }
 .token-option {
   display: flex;
@@ -734,7 +824,7 @@ textarea.control {
   padding: 23px 12px;
   color: #a4b1c4;
 }
-.result-empty > span {
+.result-empty > svg {
   font-size: 21px;
   color: #bcc9de;
 }

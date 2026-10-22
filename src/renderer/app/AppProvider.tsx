@@ -19,6 +19,7 @@ import type {
   SettingsInput,
 } from '../../shared/contracts'
 import { client } from './client'
+import { Send } from 'lucide-react'
 import {
   createWorkbenchState,
   workbenchReducer,
@@ -93,7 +94,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   if (!snapshot)
     return (
       <main className="empty">
-        <div className="brand-icon">↗</div>
+        <div className="brand-icon">
+          <Send size={28} strokeWidth={1.8} aria-hidden="true" />
+        </div>
         <h1>Pusher</h1>
         <p>{error || '正在恢复本地配置…'}</p>
         {error && (

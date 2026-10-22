@@ -1,10 +1,14 @@
 import type { AndroidConfig, CredentialSummary } from '../../shared/contracts'
+import { CircleCheck, Upload } from 'lucide-react'
 export function CredentialInfo({ credential }: { credential?: CredentialSummary }) {
   return (
     <div className="credential-info">
       {credential ? (
         <>
-          <strong>✓ {credential.fileName}</strong>
+          <strong className="with-icon">
+            <CircleCheck size={16} aria-hidden="true" />
+            {credential.fileName}
+          </strong>
           {credential.projectId && <span>项目：{credential.projectId}</span>}
           {credential.clientEmail && <span>{credential.clientEmail}</span>}
           {credential.expiresAt && (
@@ -43,7 +47,8 @@ export function FcmSettings({
       </label>
       <div className="field">
         <label>服务账号 JSON</label>
-        <button className="secondary" onClick={onImport}>
+        <button className="secondary with-icon" onClick={onImport}>
+          <Upload size={16} aria-hidden="true" />
           导入 Firebase 密钥
         </button>
         <CredentialInfo credential={credential} />

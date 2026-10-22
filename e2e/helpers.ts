@@ -33,13 +33,13 @@ export async function configure(app: ElectronApplication, root: string) {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
   }, file)
   const page = await app.firstWindow()
-  await page.getByRole('link', { name: '⚙ 设置' }).click()
+  await page.getByRole('link', { name: '设置', exact: true }).click()
   await page.getByRole('tab', { name: 'Android 推送' }).click()
   await page.getByLabel('Android 包名').fill('com.example.pusher')
   await page.getByRole('button', { name: '导入 Firebase 密钥' }).click()
   await page.getByText('凭据已导入，请保存设置。').waitFor()
   await page.getByRole('button', { name: '保存设置', exact: true }).click()
   await page.getByText('设置已保存，下次启动会自动加载。').waitFor()
-  await page.getByRole('link', { name: '← 返回工作台' }).click()
+  await page.getByRole('link', { name: '返回工作台' }).click()
   return { page, privateKey }
 }

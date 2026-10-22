@@ -6,15 +6,19 @@
 
 ## 使用方式
 
-Windows 安装包生成在 `release/`。也可以直接运行 `release/win-unpacked/Pusher.exe`。
+本次 0.1.1 安装包位于 `release/0.1.1/`，也可以直接运行 `release/0.1.1/win-unpacked/Pusher.exe`。更新前先正常退出旧版本；同一用户目录只允许一个实例运行。现有加密配置与设备记录继续使用。
 
 1. 打开工具，进入右上角「设置」。
 2. 配置应用名称，以及当前平台、环境对应的推送凭据，点击「保存设置」。
 3. 回到工作台，选择 Android 或 iOS。默认进入测试环境，可以手动切换生产环境。
-4. 粘贴设备 token，或从下拉历史中选择。可以添加设备备注并保存。
+4. 粘贴设备 token，填写「设备名称（可选）」并点击「保存设备」；也可以从下拉历史中选择。
 5. 使用表单或原始 JSON 编辑消息，核对右侧请求预览后发送。
 
 配置、凭据、token、草稿和最近 100 条发送记录保存在本机。进入设置再返回会保留消息内容；正常退出前会刷新尚未保存的草稿。
+
+修改设备名称：在设备下拉列表点击铅笔按钮，修改名称后点击「保存名称」，也可以按 Enter 保存。更新的是同一条设备记录；列表刷新不会覆盖正在编辑的名称。名称需要手动保存后才会在重启时恢复。
+
+界面与应用图标使用 Lucide；原始许可文本见 [第三方许可声明](THIRD_PARTY_NOTICES.md)，声明随安装包分发。
 
 ## 推送配置
 
@@ -124,6 +128,13 @@ npm run test:e2e
 npm run pack
 npm run verify:package
 npm run dist:win
+```
+
+如果旧版发布目录中的程序仍在运行，可以将本次构建输出到独立目录：
+
+```powershell
+npm run dist:win -- --config.directories.output=release/0.1.1
+npm run verify:package -- release/0.1.1/win-unpacked/resources/app.asar
 ```
 
 在 macOS 上分别构建两个架构：

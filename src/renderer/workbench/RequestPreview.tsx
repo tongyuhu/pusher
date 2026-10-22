@@ -1,4 +1,5 @@
 import type { PreviewRequest, JsonObject } from '../../shared/contracts'
+import { Copy, Braces } from 'lucide-react'
 export function RequestPreview({
   preview,
   payload,
@@ -23,7 +24,10 @@ export function RequestPreview({
   return (
     <section>
       <div className="section-heading">
-        <h3>请求预览</h3>
+        <h3 className="with-icon">
+          <Braces size={15} aria-hidden="true" />
+          请求预览
+        </h3>
         <span className="format-tag">JSON</span>
       </div>
       {error ? (
@@ -50,6 +54,7 @@ export function RequestPreview({
                 void navigator.clipboard.writeText(JSON.stringify(body, null, 2)).catch(() => {})
               }
             >
+              <Copy size={14} aria-hidden="true" />
               复制消息
             </button>
           </div>

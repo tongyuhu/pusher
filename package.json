@@ -1,6 +1,6 @@
 {
   "name": "pusher-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "本机 iOS 与 Android 推送测试工具",
   "private": true,
   "type": "module",
@@ -26,6 +26,7 @@
     "@codemirror/lang-json": "6.0.2",
     "@uiw/react-codemirror": "4.25.12",
     "google-auth-library": "11.3.1",
+    "lucide-react": "1.61.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router-dom": "7.18.4",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
+    "@resvg/resvg-js": "2.6.2",
     "@swc/core": "1.16.18",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",

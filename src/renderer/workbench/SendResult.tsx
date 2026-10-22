@@ -1,4 +1,5 @@
 import type { SendReceipt } from '../../shared/contracts'
+import { Send, CircleCheck, CircleX, TriangleAlert, LoaderCircle, CircleHelp } from 'lucide-react'
 import { maskToken } from './TargetPicker'
 export const statusNames = {
   sending: '发送中',
@@ -8,6 +9,15 @@ export const statusNames = {
   unknown: '发送状态未知',
 }
 export function SendResult({ receipt }: { receipt?: SendReceipt }) {
+  const StatusIcon = receipt
+    ? {
+        accepted: CircleCheck,
+        rejected: CircleX,
+        'not-sent': TriangleAlert,
+        sending: LoaderCircle,
+        unknown: CircleHelp,
+      }[receipt.status]
+    : Send
   return (
     <section className="result-section">
       <div className="section-heading">
@@ -22,8 +32,12 @@ export function SendResult({ receipt }: { receipt?: SendReceipt }) {
         <>
           <div className={`send-result ${receipt.status}`}>
             <div className="result-title">
-              <strong>
-                {receipt.status === 'accepted' ? '✓ ' : receipt.status === 'sending' ? '◌ ' : '! '}
+              <strong className="with-icon">
+                <StatusIcon
+                  size={17}
+                  className={receipt.status === 'sending' ? 'spin' : undefined}
+                  aria-hidden="true"
+                />
                 {statusNames[receipt.status]}
               </strong>
               <span>{receipt.httpStatus || ''}</span>
@@ -53,7 +67,7 @@ export function SendResult({ receipt }: { receipt?: SendReceipt }) {
         </>
       ) : (
         <div className="result-empty">
-          <span>↗</span>
+          <Send size={28} strokeWidth={1.6} aria-hidden="true" />
           <p>准备就绪，等待第一次发送</p>
           <small>推送服务接受请求后，在设备上确认实际表现。</small>
         </div>

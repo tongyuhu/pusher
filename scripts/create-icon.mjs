@@ -1,81 +1,36 @@
-// 以同一组简单几何图形生成跨平台 PNG 和 Windows ICO，不依赖外部绘图工具。
+// 应用标识与界面使用同一款 Lucide Send 图标，离线生成 SVG、PNG 和 ICO。
 import { writeFileSync, mkdirSync } from 'node:fs'
-import { deflateSync } from 'node:zlib'
-const size = 256,
-  pixels = Buffer.alloc((size * 4 + 1) * size)
-function segment(x, y, a, b) {
-  const dx = b[0] - a[0],
-    dy = b[1] - a[1],
-    t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)))
-  return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy)
-}
-const lines = [
-  [
-    [76, 180],
-    [180, 76],
-  ],
-  [
-    [104, 76],
-    [180, 76],
-  ],
-  [
-    [180, 76],
-    [180, 152],
-  ],
-]
-for (let y = 0; y < size; y++)
-  for (let x = 0; x < size; x++) {
-    const sum = [0, 0, 0, 0]
-    for (let a = 0; a < 4; a++)
-      for (let b = 0; b < 4; b++) {
-        const px = x + (a + 0.5) / 4,
-          py = y + (b + 0.5) / 4,
-          cx = Math.max(60, Math.min(196, px)),
-          cy = Math.max(60, Math.min(196, py))
-        if (Math.hypot(px - cx, py - cy) > 60) continue
-        const white = lines.some(([start, end]) => segment(px, py, start, end) < 9),
-          color = white ? [255, 255, 255] : [79, 111, 223]
-        for (let c = 0; c < 3; c++) sum[c] += color[c]
-        sum[3] += 255
-      }
-    const index = y * (size * 4 + 1) + 1 + x * 4
-    for (let c = 0; c < 4; c++) pixels[index + c] = Math.round(sum[c] / 16)
-  }
-function crc32(data) {
-  let crc = 0xffffffff
-  for (const byte of data) {
-    crc ^= byte
-    for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
-function chunk(name, data) {
-  const type = Buffer.from(name),
-    length = Buffer.alloc(4),
-    crc = Buffer.alloc(4)
-  length.writeUInt32BE(data.length)
-  crc.writeUInt32BE(crc32(Buffer.concat([type, data])))
-  return Buffer.concat([length, type, data, crc])
-}
-const ihdr = Buffer.alloc(13)
-ihdr.writeUInt32BE(size)
-ihdr.writeUInt32BE(size, 4)
-ihdr[8] = 8
-ihdr[9] = 6
-const png = Buffer.concat([
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-  chunk('IHDR', ihdr),
-  chunk('IDAT', deflateSync(pixels)),
-  chunk('IEND', Buffer.alloc(0)),
-])
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { Send } from 'lucide-react'
+import { Resvg } from '@resvg/resvg-js'
+
+const mark = renderToStaticMarkup(
+  createElement(Send, {
+    x: 108,
+    y: 108,
+    width: 296,
+    height: 296,
+    color: '#fff',
+    strokeWidth: 1.65,
+  }),
+)
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs><linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6478f0"/><stop offset="1" stop-color="#4659ce"/></linearGradient></defs>
+<rect width="512" height="512" rx="116" fill="url(#background)"/>
+${mark}
+</svg>`
+const png = Buffer.from(new Resvg(svg, { fitTo: { mode: 'width', value: 512 } }).render().asPng())
+const icoPng = Buffer.from(new Resvg(svg, { fitTo: { mode: 'width', value: 256 } }).render().asPng())
 const header = Buffer.alloc(22)
 header.writeUInt16LE(1, 2)
 header.writeUInt16LE(1, 4)
 header.writeUInt16LE(1, 10)
 header.writeUInt16LE(32, 12)
-header.writeUInt32LE(png.length, 14)
+header.writeUInt32LE(icoPng.length, 14)
 header.writeUInt32LE(22, 18)
 mkdirSync('build', { recursive: true })
+writeFileSync('build/icon.svg', svg)
 writeFileSync('build/icon.png', png)
-writeFileSync('build/icon.ico', Buffer.concat([header, png]))
-console.log('图标已生成：256px PNG / ICO')
+writeFileSync('build/icon.ico', Buffer.concat([header, icoPng]))
+console.log('Lucide Send 应用图标已生成：SVG / 512px PNG / 256px ICO')

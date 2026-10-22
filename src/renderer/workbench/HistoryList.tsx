@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { History, RotateCcw } from 'lucide-react'
 import type { SendReceipt } from '../../shared/contracts'
 import { statusNames } from './SendResult'
 import { maskToken } from './TargetPicker'
@@ -15,7 +16,10 @@ export function HistoryList({
   return (
     <section className="history-section">
       <div className="section-heading">
-        <h3>最近发送</h3>
+        <h3 className="with-icon">
+          <History size={15} aria-hidden="true" />
+          最近发送
+        </h3>
         {history.length > 3 && (
           <button className="text-button" onClick={() => setAll(!all)}>
             {all ? '收起' : `全部 ${history.length} 条`}
@@ -43,6 +47,7 @@ export function HistoryList({
               })}
             </span>
             <button className="text-button" onClick={() => onLoad(r)}>
+              <RotateCcw size={13} aria-hidden="true" />
               载入编辑
             </button>
           </div>

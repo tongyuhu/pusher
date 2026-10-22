@@ -120,16 +120,19 @@ export function useWorkbench() {
   const saveToken = async (note: string) => {
     if (!scope) {
       setFeedback('请先配置当前平台和环境')
-      return
+      return false
     }
     const r = await client().saveToken({ scope, token: state.token, note })
     if (r.ok) {
       if (app.tokenSelections.current[key]?.trim() === r.value.token)
         void client().selectToken({ scope, id: r.value.id })
-      if (currentKey.current !== key) return
-      setFeedback('设备 token 已保存')
+      if (currentKey.current !== key) return true
+      setTokens((previous) => [r.value, ...previous.filter((t) => t.id !== r.value.id)])
+      setFeedback('设备已保存，名称已更新')
       await reloadTokens()
+      return true
     } else if (currentKey.current === key) setFeedback(r.error.message)
+    return false
   }
   const deleteToken = async (id: string) => {
     if (!scope) return

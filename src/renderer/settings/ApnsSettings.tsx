@@ -1,5 +1,6 @@
 import type { IosConfig, CredentialSummary } from '../../shared/contracts'
 import { CredentialInfo } from './FcmSettings'
+import { Upload } from 'lucide-react'
 export function ApnsSettings({
   value,
   onChange,
@@ -67,7 +68,8 @@ export function ApnsSettings({
           />
         </label>
       )}
-      <button className="secondary" onClick={onImport}>
+      <button className="secondary with-icon" onClick={onImport}>
+        <Upload size={16} aria-hidden="true" />
         {value.authKind === 'p8' ? '导入 .p8 密钥' : '导入 .p12 证书'}
       </button>
       <CredentialInfo credential={credential} />

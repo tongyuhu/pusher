@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useBlocker } from 'react-router-dom'
+import { ArrowLeft, AppWindow, Smartphone, Save, LockKeyhole } from 'lucide-react'
 import type { Environment, SettingsInput, PublicConfig } from '../../shared/contracts'
 import { useApp } from '../app/AppProvider'
 import { client } from '../app/client'
@@ -73,13 +74,14 @@ export function SettingsPage() {
     <div className="settings-page">
       <header className="page-header">
         <Link to="/" className="back-link">
-          ← 返回工作台
+          <ArrowLeft size={16} aria-hidden="true" /> 返回工作台
         </Link>
         <div>
           <h1>设置</h1>
           <p className="muted">配置一次，下次打开即可使用。</p>
         </div>
         <button className="primary" disabled={saving || !dirty} onClick={() => void save()}>
+          <Save size={16} aria-hidden="true" />
           {saving ? '处理中…' : '保存设置'}
         </button>
       </header>
@@ -100,10 +102,17 @@ export function SettingsPage() {
                 setFeedback('')
               }}
             >
+              {id === 'app' ? (
+                <AppWindow size={17} aria-hidden="true" />
+              ) : (
+                <Smartphone size={17} aria-hidden="true" />
+              )}
               {label}
             </button>
           ))}
           <div className="local-note">
+            <LockKeyhole size={16} aria-hidden="true" />
+            <br />
             配置与凭据保存在本机
             <br />
             每次启动默认测试环境

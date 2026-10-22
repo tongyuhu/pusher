@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Send, Settings, PanelRight, Smartphone } from 'lucide-react'
+import { scopeKey } from '../../shared/scope'
 import type { Environment, SendReceipt } from '../../shared/contracts'
 import { useWorkbench } from '../state/useWorkbench'
 import { TargetPicker } from './TargetPicker'
@@ -20,7 +22,9 @@ export function WorkbenchPage() {
     <div className={collapsed ? 'workbench preview-collapsed' : 'workbench'}>
       <header className="workbench-header">
         <div className="logo-lockup">
-          <div className="brand-icon">↗</div>
+          <div className="brand-icon">
+            <Send size={24} strokeWidth={1.8} aria-hidden="true" />
+          </div>
           <div>
             <h1>Pusher</h1>
             <span>把消息送到测试设备</span>
@@ -53,10 +57,10 @@ export function WorkbenchPage() {
           aria-label={collapsed ? '显示预览' : '隐藏预览'}
           onClick={() => setCollapsed(!collapsed)}
         >
-          ◫ 预览
+          <PanelRight size={15} aria-hidden="true" /> 预览
         </button>
         <Link className="settings-link" to="/settings">
-          ⚙ 设置
+          <Settings size={15} aria-hidden="true" /> 设置
         </Link>
       </header>
       <div className="workbench-body">
@@ -73,16 +77,18 @@ export function WorkbenchPage() {
                     w.dispatch({ type: 'selectPlatform', platform })
                   }}
                 >
+                  <Smartphone size={14} aria-hidden="true" />
                   {platform === 'ios' ? 'iOS' : 'Android'}
                 </button>
               ))}
             </div>
           </div>
           <TargetPicker
+            key={w.scope ? scopeKey(w.scope) : `${state.platform}:${state.environment}`}
             token={state.token}
             tokens={w.tokens}
             onChange={w.setToken}
-            onSave={(note) => void w.saveToken(note)}
+            onSave={w.saveToken}
             onDelete={(id) => void w.deleteToken(id)}
           />
           {!w.configured && (
@@ -106,6 +112,7 @@ export function WorkbenchPage() {
                 void w.send()
               }}
             >
+              <Send size={16} aria-hidden="true" />
               {state.sending ? '发送中…' : '发送推送'}
             </button>
             <div>
