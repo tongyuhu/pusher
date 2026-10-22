@@ -1,1 +1,1 @@
-export const client=()=>window.pusher
+export const client = () => window.pusher

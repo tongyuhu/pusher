@@ -1,17 +1,134 @@
-import { afterEach,expect,it,vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { SendCoordinator } from './coordinator'
 import { HistoryService } from '../history/service'
 import { ConfigService } from '../config/service'
 import { TokenService } from '../tokens/service'
-import { testStore,value } from '../../test/helpers'
+import { testStore, value } from '../../test/helpers'
 import { fcmFixture } from '../../test/credential-fixtures'
 import { createDraft } from '../../shared/message/draft'
 import type { SendInput } from '../../shared/contracts'
-async function setup(adapter:any){const store=await testStore(),config=new ConfigService(store,async()=>({fileName:'fcm.json',bytes:fcmFixture()}));const c=value(await config.importCredential({kind:'fcm'}))!;const {revision,...s}=(await store.read()).config;value(await config.saveSettings({...s,expectedRevision:revision,android:{...s.android,test:{packageName:'com.example',credentialId:c.id}}}));const history=new HistoryService(store),coordinator=new SendCoordinator({store,configService:config,history,tokenService:new TokenService(store),adapters:{android:adapter,ios:adapter}});const input:SendInput={scope:{platform:'android',environment:'test',packageName:'com.example',projectId:'test-project'},configRevision:1,token:'device-secret',draft:createDraft('android')};return {coordinator,input,history,store,config}}
-afterEach(()=>vi.useRealTimers())
-it('发送锁阻止重复，快照不跟随编辑改变',async()=>{let finish!:(v:any)=>void,begun!:()=>void;const started=new Promise<void>(r=>begun=r);const {coordinator,input,history}=await setup({send:async()=>{begun();return new Promise(r=>finish=r)},invalidate:async()=>{}});const sending=coordinator.send(input);await started;expect((await coordinator.send(input)).ok).toBe(false);input.draft.rawText='{}';input.scope.environment='production';finish({status:'accepted'});const receipt=value(await sending);expect(receipt.snapshot.scope.environment).toBe('test');expect(JSON.stringify(receipt.snapshot.request.body)).toContain('推送测试');expect((await history.list())[0].status).toBe('accepted')})
-it('旧配置与非法内容不创建发送记录',async()=>{const {coordinator,input,history}=await setup({send:async()=>{throw Error('不应发送')},invalidate:async()=>{}});expect((await coordinator.send({...input,configRevision:0})).ok).toBe(false);expect((await coordinator.send({...input,draft:{...input.draft,rawText:'{'}})).ok).toBe(false);expect(await history.list()).toEqual([]);expect(coordinator.isBusy()).toBe(false)})
-it('服务已接受但记录保存失败仍为 accepted',async()=>{const {coordinator,input,history}=await setup({send:async()=>({status:'accepted'}),invalidate:async()=>{}});history.finish=async()=>{throw Error('disk')};const receipt=value(await coordinator.send(input));expect(receipt.status).toBe('accepted');expect(receipt.persisted).toBe(false);expect(coordinator.isBusy()).toBe(false)})
-it('开始记录写入失败不会调用网络',async()=>{let calls=0;const {coordinator,input,history}=await setup({send:async()=>{calls++;return {status:'accepted'}},invalidate:async()=>{}});history.start=async()=>{throw Error('disk')};expect((await coordinator.send(input)).ok).toBe(false);expect(calls).toBe(0)})
-it('30 秒后释放锁，忽略无响应适配器，绝不自动重试',async()=>{let started!:()=>void,calls=0;const begun=new Promise<void>(r=>started=r);const {coordinator,input}=await setup({send:async()=>{calls++;started();return new Promise(()=>{})},invalidate:async()=>{}});vi.useFakeTimers();const sending=coordinator.send(input);await begun;await vi.advanceTimersByTimeAsync(30000);const receipt=value(await sending);expect(receipt.status).toBe('unknown');expect(calls).toBe(1);expect(coordinator.isBusy()).toBe(false)})
-it('错误详情不回显设备 token，并标记明确无效 token',async()=>{const {coordinator,input,store}=await setup({send:async()=>({status:'rejected',providerCode:'UNREGISTERED',detail:'token=device-secret'}),invalidate:async()=>{}});const result=value(await coordinator.send(input));expect(result.detail).not.toContain('device-secret');expect((await store.read()).tokens[0].invalidReason).toBe('UNREGISTERED')})
+async function setup(adapter: any) {
+  const store = await testStore(),
+    config = new ConfigService(store, async () => ({ fileName: 'fcm.json', bytes: fcmFixture() }))
+  const c = value(await config.importCredential({ kind: 'fcm' }))!
+  const { revision, ...s } = (await store.read()).config
+  value(
+    await config.saveSettings({
+      ...s,
+      expectedRevision: revision,
+      android: { ...s.android, test: { packageName: 'com.example', credentialId: c.id } },
+    }),
+  )
+  const history = new HistoryService(store),
+    coordinator = new SendCoordinator({
+      store,
+      configService: config,
+      history,
+      tokenService: new TokenService(store),
+      adapters: { android: adapter, ios: adapter },
+    })
+  const input: SendInput = {
+    scope: {
+      platform: 'android',
+      environment: 'test',
+      packageName: 'com.example',
+      projectId: 'test-project',
+    },
+    configRevision: 1,
+    token: 'device-secret',
+    draft: createDraft('android'),
+  }
+  return { coordinator, input, history, store, config }
+}
+afterEach(() => vi.useRealTimers())
+it('发送锁阻止重复，快照不跟随编辑改变', async () => {
+  let finish!: (v: any) => void, begun!: () => void
+  const started = new Promise<void>((r) => (begun = r))
+  const { coordinator, input, history } = await setup({
+    send: async () => {
+      begun()
+      return new Promise((r) => (finish = r))
+    },
+    invalidate: async () => {},
+  })
+  const sending = coordinator.send(input)
+  await started
+  expect((await coordinator.send(input)).ok).toBe(false)
+  input.draft.rawText = '{}'
+  input.scope.environment = 'production'
+  finish({ status: 'accepted' })
+  const receipt = value(await sending)
+  expect(receipt.snapshot.scope.environment).toBe('test')
+  expect(JSON.stringify(receipt.snapshot.request.body)).toContain('推送测试')
+  expect((await history.list())[0].status).toBe('accepted')
+})
+it('旧配置与非法内容不创建发送记录', async () => {
+  const { coordinator, input, history } = await setup({
+    send: async () => {
+      throw Error('不应发送')
+    },
+    invalidate: async () => {},
+  })
+  expect((await coordinator.send({ ...input, configRevision: 0 })).ok).toBe(false)
+  expect((await coordinator.send({ ...input, draft: { ...input.draft, rawText: '{' } })).ok).toBe(false)
+  expect(await history.list()).toEqual([])
+  expect(coordinator.isBusy()).toBe(false)
+})
+it('服务已接受但记录保存失败仍为 accepted', async () => {
+  const { coordinator, input, history } = await setup({
+    send: async () => ({ status: 'accepted' }),
+    invalidate: async () => {},
+  })
+  history.finish = async () => {
+    throw Error('disk')
+  }
+  const receipt = value(await coordinator.send(input))
+  expect(receipt.status).toBe('accepted')
+  expect(receipt.persisted).toBe(false)
+  expect(coordinator.isBusy()).toBe(false)
+})
+it('开始记录写入失败不会调用网络', async () => {
+  let calls = 0
+  const { coordinator, input, history } = await setup({
+    send: async () => {
+      calls++
+      return { status: 'accepted' }
+    },
+    invalidate: async () => {},
+  })
+  history.start = async () => {
+    throw Error('disk')
+  }
+  expect((await coordinator.send(input)).ok).toBe(false)
+  expect(calls).toBe(0)
+})
+it('30 秒后释放锁，忽略无响应适配器，绝不自动重试', async () => {
+  let started!: () => void,
+    calls = 0
+  const begun = new Promise<void>((r) => (started = r))
+  const { coordinator, input } = await setup({
+    send: async () => {
+      calls++
+      started()
+      return new Promise(() => {})
+    },
+    invalidate: async () => {},
+  })
+  vi.useFakeTimers()
+  const sending = coordinator.send(input)
+  await begun
+  await vi.advanceTimersByTimeAsync(30000)
+  const receipt = value(await sending)
+  expect(receipt.status).toBe('unknown')
+  expect(calls).toBe(1)
+  expect(coordinator.isBusy()).toBe(false)
+})
+it('错误详情不回显设备 token，并标记明确无效 token', async () => {
+  const { coordinator, input, store } = await setup({
+    send: async () => ({ status: 'rejected', providerCode: 'UNREGISTERED', detail: 'token=device-secret' }),
+    invalidate: async () => {},
+  })
+  const result = value(await coordinator.send(input))
+  expect(result.detail).not.toContain('device-secret')
+  expect((await store.read()).tokens[0].invalidReason).toBe('UNREGISTERED')
+})

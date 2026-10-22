@@ -6,7 +6,14 @@ export async function atomicWrite(file: string, data: Buffer): Promise<void> {
   const temp = `${file}.${randomUUID()}.tmp`
   try {
     const handle = await open(temp, 'wx', 0o600)
-    try { await handle.writeFile(data); await handle.sync() } finally { await handle.close() }
+    try {
+      await handle.writeFile(data)
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
     await rename(temp, file)
-  } finally { await unlink(temp).catch(() => {}) }
+  } finally {
+    await unlink(temp).catch(() => {})
+  }
 }

@@ -1,9 +1,102 @@
-import { expect,it } from 'vitest'
+import { expect, it } from 'vitest'
 import { ApnsAdapter } from './adapter'
 import { p8 } from '../../../test/credential-fixtures'
 import { DispatchFailure } from '../errors'
-function context(kind='apns-p8'):any{return {snapshot:{token:'aabb',scope:{platform:'ios',environment:'test',bundleId:'com.example'},request:{headers:{'apns-topic':'com.example','apns-push-type':'background','apns-priority':'5'}}},resolved:{scope:{platform:'ios',environment:'test',bundleId:'com.example'},credentialId:'one',credential:kind==='apns-p8'?{kind,privateKey:p8()}:{kind,originalBase64:Buffer.from('pfx-binary').toString('base64'),password:'secret'},apns:{keyId:'KEY1234567',teamId:'TEAM123456'}},payload:{aps:{'content-available':1}}}}
-it.each(['apns-p8','apns-p12'])('%s 使用对应鉴权且正确读取 apns-id',async(kind)=>{const reqs:any[]=[];const a=new ApnsAdapter({request:async(r:any)=>{reqs.push(r);return {status:200,headers:{'apns-id':'example-id'},body:''}}});const r=await a.send(context(kind),new AbortController().signal);expect(r.status).toBe('accepted');expect(r.providerId).toBe('example-id');expect(reqs[0].url).toBe('https://api.sandbox.push.apple.com/3/device/aabb');if(kind==='apns-p8')expect(reqs[0].headers.authorization).toMatch(/^bearer /);else {expect(reqs[0].headers.authorization).toBeUndefined();expect(reqs[0].tls.pfx).toEqual(Buffer.from('pfx-binary'));expect(reqs[0].tls.passphrase).toBe('secret')}})
-it('生产环境与错误响应不自动重试',async()=>{let calls=0;const a=new ApnsAdapter({request:async(r:any)=>{calls++;expect(r.url).toBe('https://api.push.apple.com/3/device/aabb');return {status:410,headers:{},body:'{"reason":"Unregistered"}'}}});const c=context();c.snapshot.scope.environment='production';c.resolved.scope.environment='production';const r=await a.send(c,new AbortController().signal);expect(r.status).toBe('rejected');expect(r.providerCode).toBe('Unregistered');expect(calls).toBe(1)})
-it('连接后流中断为未知，非法 token 和换行请求头不发送',async()=>{let calls=0;const a=new ApnsAdapter({request:async()=>{calls++;throw new DispatchFailure('may-have-been-sent','STREAM_RESET')}});expect((await a.send(context(),new AbortController().signal)).status).toBe('unknown');const bad=context();bad.snapshot.token='../secret';expect((await a.send(bad,new AbortController().signal)).status).toBe('not-sent');bad.snapshot.token='aa';bad.snapshot.request.headers['apns-topic']='evil\r\nheader';expect((await a.send(bad,new AbortController().signal)).status).toBe('not-sent');expect(calls).toBe(1)})
-it('JWT 缓存 50 分钟后刷新，更换凭据后清理',async()=>{let now=1700000000000;const tokens:string[]=[];const a=new ApnsAdapter({request:async(r:any)=>{tokens.push(r.headers.authorization);return {status:200,headers:{},body:''}}},undefined,()=>now);const c=context();await a.send(c,new AbortController().signal);await a.send(c,new AbortController().signal);expect(tokens[1]).toBe(tokens[0]);now+=3000001;await a.send(c,new AbortController().signal);expect(tokens[2]).not.toBe(tokens[0]);await a.invalidate('one');await a.send(c,new AbortController().signal);expect(tokens[3]).not.toBe(tokens[2])})
+function context(kind = 'apns-p8'): any {
+  return {
+    snapshot: {
+      token: 'aabb',
+      scope: { platform: 'ios', environment: 'test', bundleId: 'com.example' },
+      request: {
+        headers: { 'apns-topic': 'com.example', 'apns-push-type': 'background', 'apns-priority': '5' },
+      },
+    },
+    resolved: {
+      scope: { platform: 'ios', environment: 'test', bundleId: 'com.example' },
+      credentialId: 'one',
+      credential:
+        kind === 'apns-p8'
+          ? { kind, privateKey: p8() }
+          : { kind, originalBase64: Buffer.from('pfx-binary').toString('base64'), password: 'secret' },
+      apns: { keyId: 'KEY1234567', teamId: 'TEAM123456' },
+    },
+    payload: { aps: { 'content-available': 1 } },
+  }
+}
+it.each(['apns-p8', 'apns-p12'])('%s 使用对应鉴权且正确读取 apns-id', async (kind) => {
+  const reqs: any[] = []
+  const a = new ApnsAdapter({
+    request: async (r: any) => {
+      reqs.push(r)
+      return { status: 200, headers: { 'apns-id': 'example-id' }, body: '' }
+    },
+  })
+  const r = await a.send(context(kind), new AbortController().signal)
+  expect(r.status).toBe('accepted')
+  expect(r.providerId).toBe('example-id')
+  expect(reqs[0].url).toBe('https://api.sandbox.push.apple.com/3/device/aabb')
+  if (kind === 'apns-p8') expect(reqs[0].headers.authorization).toMatch(/^bearer /)
+  else {
+    expect(reqs[0].headers.authorization).toBeUndefined()
+    expect(reqs[0].tls.pfx).toEqual(Buffer.from('pfx-binary'))
+    expect(reqs[0].tls.passphrase).toBe('secret')
+  }
+})
+it('生产环境与错误响应不自动重试', async () => {
+  let calls = 0
+  const a = new ApnsAdapter({
+    request: async (r: any) => {
+      calls++
+      expect(r.url).toBe('https://api.push.apple.com/3/device/aabb')
+      return { status: 410, headers: {}, body: '{"reason":"Unregistered"}' }
+    },
+  })
+  const c = context()
+  c.snapshot.scope.environment = 'production'
+  c.resolved.scope.environment = 'production'
+  const r = await a.send(c, new AbortController().signal)
+  expect(r.status).toBe('rejected')
+  expect(r.providerCode).toBe('Unregistered')
+  expect(calls).toBe(1)
+})
+it('连接后流中断为未知，非法 token 和换行请求头不发送', async () => {
+  let calls = 0
+  const a = new ApnsAdapter({
+    request: async () => {
+      calls++
+      throw new DispatchFailure('may-have-been-sent', 'STREAM_RESET')
+    },
+  })
+  expect((await a.send(context(), new AbortController().signal)).status).toBe('unknown')
+  const bad = context()
+  bad.snapshot.token = '../secret'
+  expect((await a.send(bad, new AbortController().signal)).status).toBe('not-sent')
+  bad.snapshot.token = 'aa'
+  bad.snapshot.request.headers['apns-topic'] = 'evil\r\nheader'
+  expect((await a.send(bad, new AbortController().signal)).status).toBe('not-sent')
+  expect(calls).toBe(1)
+})
+it('JWT 缓存 50 分钟后刷新，更换凭据后清理', async () => {
+  let now = 1700000000000
+  const tokens: string[] = []
+  const a = new ApnsAdapter(
+    {
+      request: async (r: any) => {
+        tokens.push(r.headers.authorization)
+        return { status: 200, headers: {}, body: '' }
+      },
+    },
+    undefined,
+    () => now,
+  )
+  const c = context()
+  await a.send(c, new AbortController().signal)
+  await a.send(c, new AbortController().signal)
+  expect(tokens[1]).toBe(tokens[0])
+  now += 3000001
+  await a.send(c, new AbortController().signal)
+  expect(tokens[2]).not.toBe(tokens[0])
+  await a.invalidate('one')
+  await a.send(c, new AbortController().signal)
+  expect(tokens[3]).not.toBe(tokens[2])
+})

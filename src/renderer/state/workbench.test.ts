@@ -1,5 +1,44 @@
-import { expect,it } from 'vitest'
-import { createWorkbenchState,workbenchReducer } from './workbench'
-it('启动默认测试，切换目标清空旧 token，载入历史不切生产',()=>{let s=createWorkbenchState('ios');expect(s.environment).toBe('test');s=workbenchReducer(s,{type:'selectToken',token:'aa'});s=workbenchReducer(s,{type:'selectEnvironment',environment:'production'});expect(s.token).toBe('');s=workbenchReducer({...s,environment:'test'},{type:'loadHistory',receipt:{snapshot:{scope:{platform:'ios',environment:'production'},token:'bb'}} as any,scopeMatches:false});expect(s.environment).toBe('test');expect(s.token).toBe('')})
-it('旧请求的终态不覆盖较新请求结果',()=>{let s=createWorkbenchState('android');s=workbenchReducer(s,{type:'sendUpdate',receipt:{status:'sending',snapshot:{id:'new'}} as any});s=workbenchReducer(s,{type:'sendUpdate',receipt:{status:'accepted',snapshot:{id:'old'}} as any});expect(s.activeId).toBe('new');expect(s.sending).toBe(true)})
-it('初始化记录在新请求后仍保留',()=>{let s=workbenchReducer(createWorkbenchState('android'),{type:'restore',platform:'ios',history:[{snapshot:{id:'old',startedAt:'2026-01-01'},status:'accepted'}]} as any);s=workbenchReducer(s,{type:'sendUpdate',receipt:{status:'sending',snapshot:{id:'new',startedAt:'2026-02-01'}} as any});expect(s.history.map(h=>h.snapshot.id)).toEqual(['new','old'])})
+import { expect, it } from 'vitest'
+import { createWorkbenchState, workbenchReducer } from './workbench'
+it('启动默认测试，切换目标清空旧 token，载入历史不切生产', () => {
+  let s = createWorkbenchState('ios')
+  expect(s.environment).toBe('test')
+  s = workbenchReducer(s, { type: 'selectToken', token: 'aa' })
+  s = workbenchReducer(s, { type: 'selectEnvironment', environment: 'production' })
+  expect(s.token).toBe('')
+  s = workbenchReducer(
+    { ...s, environment: 'test' },
+    {
+      type: 'loadHistory',
+      receipt: { snapshot: { scope: { platform: 'ios', environment: 'production' }, token: 'bb' } } as any,
+      scopeMatches: false,
+    },
+  )
+  expect(s.environment).toBe('test')
+  expect(s.token).toBe('')
+})
+it('旧请求的终态不覆盖较新请求结果', () => {
+  let s = createWorkbenchState('android')
+  s = workbenchReducer(s, {
+    type: 'sendUpdate',
+    receipt: { status: 'sending', snapshot: { id: 'new' } } as any,
+  })
+  s = workbenchReducer(s, {
+    type: 'sendUpdate',
+    receipt: { status: 'accepted', snapshot: { id: 'old' } } as any,
+  })
+  expect(s.activeId).toBe('new')
+  expect(s.sending).toBe(true)
+})
+it('初始化记录在新请求后仍保留', () => {
+  let s = workbenchReducer(createWorkbenchState('android'), {
+    type: 'restore',
+    platform: 'ios',
+    history: [{ snapshot: { id: 'old', startedAt: '2026-01-01' }, status: 'accepted' }],
+  } as any)
+  s = workbenchReducer(s, {
+    type: 'sendUpdate',
+    receipt: { status: 'sending', snapshot: { id: 'new', startedAt: '2026-02-01' } } as any,
+  })
+  expect(s.history.map((h) => h.snapshot.id)).toEqual(['new', 'old'])
+})

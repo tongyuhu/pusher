@@ -1,0 +1,31 @@
+appId: local.pusher.desktop
+productName: Pusher
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+  - '!**/test/**'
+  - '!**/tests/**'
+  - '!**/__tests__/**'
+  - '!**/*.test.*'
+  - '!**/*.spec.*'
+asar: true
+artifactName: Pusher-${version}-${os}-${arch}.${ext}
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+  icon: build/icon.png
+  identity: null

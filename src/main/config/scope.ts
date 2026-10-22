@@ -1,1 +1,1 @@
-export { makeScope,scopeKey } from '../../shared/scope'
+export { makeScope, scopeKey } from '../../shared/scope'

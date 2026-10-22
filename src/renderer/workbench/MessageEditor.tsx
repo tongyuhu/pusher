@@ -1,13 +1,156 @@
-import type { Draft,Result,JsonObject } from '../../shared/contracts'
-import { patchForm,switchEditor,switchMessageType,type FormPatch } from '../../shared/message/form'
-import { parsePayload,isObject } from '../../shared/message/json'
+import type { Draft, Result, JsonObject } from '../../shared/contracts'
+import { patchForm, switchEditor, switchMessageType, type FormPatch } from '../../shared/message/form'
+import { parsePayload, isObject } from '../../shared/message/json'
 import { JsonEditor } from './JsonEditor'
 import { AdvancedFields } from './AdvancedFields'
-export function MessageEditor({draft,onChange,onError}:{draft:Draft;onChange:(d:Draft)=>void;onError:(s:string)=>void}){
-  const parsed=parsePayload(draft.rawText),p=parsed.ok?parsed.value:{},aps=isObject(p.aps)?p.aps:{},notification=draft.platform==='android'?(isObject(p.notification)?p.notification:{}):(isObject(aps.alert)?aps.alert:{}),managed=draft.platform==='ios'&&aps.alert!==undefined&&!isObject(aps.alert)
-  const apply=(result:Result<Draft>)=>{if(result.ok){onChange(result.value);onError('')}else onError(result.error.message)}
-  const patch=(input:FormPatch)=>apply(patchForm(draft,input))
-  const data:JsonObject=draft.platform==='android'?(isObject(p.data)?p.data:{}):Object.fromEntries(Object.entries(p).filter(([k])=>k!=='aps'))
-  const dataText=typeof draft.formStash.dataEditorText==='string'?draft.formStash.dataEditorText:JSON.stringify(data,null,2)
-  return <div className="message-editor"><div className="editor-tabs"><button className={draft.mode==='form'?'active':''} onClick={()=>apply(switchEditor(draft,'form'))}>表单编辑</button><button className={draft.mode==='json'?'active':''} onClick={()=>apply(switchEditor(draft,'json'))}>原始 JSON</button><span className="spacer"/><span className="subtle">自动保存草稿</span></div>{draft.mode==='json'?<JsonEditor value={draft.rawText} onChange={rawText=>{const next=parsePayload(rawText);onChange({...draft,rawText,revision:draft.revision+1,...(next.ok?{lastValidPayload:next.value}:{})})}}/>:<><div className="message-types">{[['notification','通知消息'],['data',draft.platform==='ios'?'后台通知':'纯自定义数据'],['mixed','通知 + 数据']].map(([type,label])=><button key={type} className={draft.messageType===type?'active':''} onClick={()=>apply(switchMessageType(draft,type as Draft['messageType']))}>{label}</button>)}</div>{draft.messageType!=='data'&&(managed?<div className="info-box">当前 alert 结构由 JSON 管理，切换到原始 JSON 可继续编辑。</div>:<><label className="field">消息标题<input value={String(notification.title||'')} onChange={e=>patch({title:e.target.value})} placeholder="输入通知标题"/></label><label className="field">消息正文<textarea rows={3} value={String(notification.body||'')} onChange={e=>patch({body:e.target.value})} placeholder="输入通知内容"/></label></>)}{draft.messageType!=='notification'&&<label className="field">自定义数据<textarea className="mono" rows={4} value={dataText} spellCheck={false} onChange={e=>{const text=e.target.value,next:Draft={...draft,revision:draft.revision+1,formStash:{...draft.formStash,dataEditorText:text}},parsedData=parsePayload(text);if(parsedData.ok){const result=patchForm(next,{data:parsedData.value});if(result.ok){onChange(result.value);onError('');return}}onChange(next);onError('自定义数据格式有误，请填写 JSON 对象。')}}/><span className="hint">{draft.platform==='android'?'FCM 的自定义数据值必须是字符串。':'自定义字段与 aps 并列，后台通知接收取决于 App 能力与系统调度。'}</span></label>}<AdvancedFields draft={draft} payload={p} onPatch={patch}/></>}</div>
+export function MessageEditor({
+  draft,
+  onChange,
+  onError,
+}: {
+  draft: Draft
+  onChange: (d: Draft) => void
+  onError: (s: string) => void
+}) {
+  const parsed = parsePayload(draft.rawText),
+    p = parsed.ok ? parsed.value : {},
+    aps = isObject(p.aps) ? p.aps : {},
+    notification =
+      draft.platform === 'android'
+        ? isObject(p.notification)
+          ? p.notification
+          : {}
+        : isObject(aps.alert)
+          ? aps.alert
+          : {},
+    managed = draft.platform === 'ios' && aps.alert !== undefined && !isObject(aps.alert)
+  const apply = (result: Result<Draft>) => {
+    if (result.ok) {
+      onChange(result.value)
+      onError('')
+    } else onError(result.error.message)
+  }
+  const patch = (input: FormPatch) => apply(patchForm(draft, input))
+  const data: JsonObject =
+    draft.platform === 'android'
+      ? isObject(p.data)
+        ? p.data
+        : {}
+      : Object.fromEntries(Object.entries(p).filter(([k]) => k !== 'aps'))
+  const dataText =
+    typeof draft.formStash.dataEditorText === 'string'
+      ? draft.formStash.dataEditorText
+      : JSON.stringify(data, null, 2)
+  return (
+    <div className="message-editor">
+      <div className="editor-tabs">
+        <button
+          className={draft.mode === 'form' ? 'active' : ''}
+          onClick={() => apply(switchEditor(draft, 'form'))}
+        >
+          表单编辑
+        </button>
+        <button
+          className={draft.mode === 'json' ? 'active' : ''}
+          onClick={() => apply(switchEditor(draft, 'json'))}
+        >
+          原始 JSON
+        </button>
+        <span className="spacer" />
+        <span className="subtle">自动保存草稿</span>
+      </div>
+      {draft.mode === 'json' ? (
+        <JsonEditor
+          value={draft.rawText}
+          onChange={(rawText) => {
+            const next = parsePayload(rawText)
+            onChange({
+              ...draft,
+              rawText,
+              revision: draft.revision + 1,
+              ...(next.ok ? { lastValidPayload: next.value } : {}),
+            })
+          }}
+        />
+      ) : (
+        <>
+          <div className="message-types">
+            {[
+              ['notification', '通知消息'],
+              ['data', draft.platform === 'ios' ? '后台通知' : '纯自定义数据'],
+              ['mixed', '通知 + 数据'],
+            ].map(([type, label]) => (
+              <button
+                key={type}
+                className={draft.messageType === type ? 'active' : ''}
+                onClick={() => apply(switchMessageType(draft, type as Draft['messageType']))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {draft.messageType !== 'data' &&
+            (managed ? (
+              <div className="info-box">当前 alert 结构由 JSON 管理，切换到原始 JSON 可继续编辑。</div>
+            ) : (
+              <>
+                <label className="field">
+                  消息标题
+                  <input
+                    value={String(notification.title || '')}
+                    onChange={(e) => patch({ title: e.target.value })}
+                    placeholder="输入通知标题"
+                  />
+                </label>
+                <label className="field">
+                  消息正文
+                  <textarea
+                    rows={3}
+                    value={String(notification.body || '')}
+                    onChange={(e) => patch({ body: e.target.value })}
+                    placeholder="输入通知内容"
+                  />
+                </label>
+              </>
+            ))}
+          {draft.messageType !== 'notification' && (
+            <label className="field">
+              自定义数据
+              <textarea
+                className="mono"
+                rows={4}
+                value={dataText}
+                spellCheck={false}
+                onChange={(e) => {
+                  const text = e.target.value,
+                    next: Draft = {
+                      ...draft,
+                      revision: draft.revision + 1,
+                      formStash: { ...draft.formStash, dataEditorText: text },
+                    },
+                    parsedData = parsePayload(text)
+                  if (parsedData.ok) {
+                    const result = patchForm(next, { data: parsedData.value })
+                    if (result.ok) {
+                      onChange(result.value)
+                      onError('')
+                      return
+                    }
+                  }
+                  onChange(next)
+                  onError('自定义数据格式有误，请填写 JSON 对象。')
+                }}
+              />
+              <span className="hint">
+                {draft.platform === 'android'
+                  ? 'FCM 的自定义数据值必须是字符串。'
+                  : '自定义字段与 aps 并列，后台通知接收取决于 App 能力与系统调度。'}
+              </span>
+            </label>
+          )}
+          <AdvancedFields draft={draft} payload={p} onPatch={patch} />
+        </>
+      )}
+    </div>
+  )
 }
