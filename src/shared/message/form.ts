@@ -1,0 +1,45 @@
+import type { Draft,JsonObject,Result } from '../contracts'
+import { ok,fail } from '../result'
+import { parsePayload,isObject,bytes } from './json'
+export interface FormPatch { title?:string;body?:string;data?:JsonObject;androidPriority?:string;ttl?:number;channelId?:string;sound?:string;badge?:number;priority?:number;expiration?:number;collapseId?:string }
+function updated(d:Draft,p:JsonObject,advanced=d.advanced):Draft {return {...d,revision:d.revision+1,lastValidPayload:p,rawText:JSON.stringify(p,null,2),advanced}}
+export function patchForm(draft:Draft, patch:FormPatch):Result<Draft> {
+  const parsed=parsePayload(draft.rawText);if(!parsed.ok)return parsed
+  const p=parsed.value, advanced={...draft.advanced}
+  if (patch.ttl!==undefined && (!Number.isFinite(patch.ttl)||patch.ttl<0||patch.ttl>2419200))return fail('INVALID_TTL','TTL 必须在 0 到 2419200 秒内','ttl')
+  if (patch.collapseId!==undefined && bytes(patch.collapseId)>64)return fail('INVALID_COLLAPSE','折叠 ID 太长','collapseId')
+  if(draft.platform==='android') {
+    if(patch.title!==undefined||patch.body!==undefined) {if(p.notification!==undefined&&!isObject(p.notification))return fail('JSON_MANAGED','通知结构由 JSON 管理');const n=isObject(p.notification)?p.notification:{};if(patch.title!==undefined)n.title=patch.title;if(patch.body!==undefined)n.body=patch.body;p.notification=n}
+    if(patch.data!==undefined)p.data=patch.data
+    if(patch.androidPriority!==undefined||patch.ttl!==undefined||patch.channelId!==undefined){const a=isObject(p.android)?p.android:{};if(patch.androidPriority!==undefined)a.priority=patch.androidPriority;if(patch.ttl!==undefined)a.ttl=`${patch.ttl}s`;if(patch.channelId!==undefined){const n=isObject(a.notification)?a.notification:{};n.channel_id=patch.channelId;a.notification=n}p.android=a}
+  } else {
+    const aps=isObject(p.aps)?p.aps:{}
+    if(patch.title!==undefined||patch.body!==undefined) {if(aps.alert!==undefined&&!isObject(aps.alert))return fail('JSON_MANAGED','此 alert 由 JSON 管理，请在 JSON 中编辑');const alert=isObject(aps.alert)?aps.alert:{};if(patch.title!==undefined)alert.title=patch.title;if(patch.body!==undefined)alert.body=patch.body;aps.alert=alert}
+    if(patch.data!==undefined){if('aps' in patch.data)return fail('RESERVED_APS','自定义数据不能覆盖 aps','data');for(const key of Object.keys(p))if(key!=='aps')delete p[key];Object.assign(p,patch.data)}
+    if(patch.sound!==undefined){if(patch.sound)aps.sound=patch.sound;else delete aps.sound}
+    if(patch.badge!==undefined)aps.badge=patch.badge
+    for(const key of ['priority','expiration','collapseId'] as const)if(patch[key]!==undefined)advanced[key]=patch[key]!
+    p.aps=aps
+  }
+  // 所有表单输入仍经过相同的安全 JSON 检查。
+  const safe=parsePayload(JSON.stringify(p));if(!safe.ok)return safe
+  return ok(updated(draft,p,advanced))
+}
+export function switchEditor(draft:Draft,mode:'form'|'json'):Result<Draft>{const p=parsePayload(draft.rawText);return p.ok?ok({...updated(draft,p.value),mode}):p}
+export function switchMessageType(draft:Draft,type:Draft['messageType']):Result<Draft>{
+  const parsed=parsePayload(draft.rawText);if(!parsed.ok)return parsed
+  const p=parsed.value, stash={...draft.formStash},advanced={...draft.advanced}
+  if(draft.platform==='android'){
+    if(type==='data'){if(p.notification)stash.notification=p.notification;delete p.notification;if(isObject(p.android)&&p.android.notification){stash.androidNotification=p.android.notification;delete p.android.notification;if(!Object.keys(p.android).length)delete p.android}}
+    else if(!p.notification)p.notification=stash.notification||{title:'推送测试',body:'这是一条测试消息'}
+    if(type==='notification'){if(p.data)stash.data=p.data;delete p.data}else if(!p.data)p.data=stash.data||{}
+  }else{
+    const aps=isObject(p.aps)?p.aps:{}
+    if(type==='data'){for(const key of ['alert','sound','badge']){if(aps[key]!==undefined)stash[key]=aps[key];delete aps[key]}aps['content-available']=1;advanced.priority=5}
+    else {delete aps['content-available'];aps.alert=aps.alert||stash.alert||{title:'推送测试',body:'这是一条测试消息'};for(const key of ['sound','badge'])if(stash[key]!==undefined)aps[key]=stash[key];delete advanced.priority}
+    if(type==='notification'){const data:JsonObject={};for(const key of Object.keys(p))if(key!=='aps'){data[key]=p[key];delete p[key]}stash.data=data}
+    else if(isObject(stash.data))Object.assign(p,stash.data)
+    p.aps=aps
+  }
+  return ok({...updated(draft,p,advanced),messageType:type,formStash:stash})
+}
