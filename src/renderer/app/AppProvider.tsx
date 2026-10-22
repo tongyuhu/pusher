@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type Dispatch,
   type SetStateAction,
+  type RefObject,
 } from 'react'
 import type {
   BootstrapSnapshot,
@@ -34,6 +35,7 @@ interface Context {
   dispatch: Dispatch<WorkbenchAction>
   flushDrafts: () => Promise<void>
   saveError: string
+  tokenSelections: RefObject<Record<string, string>>
   addCredential: (c: CredentialSummary) => void
   saveSettings: (s: SettingsInput) => ReturnType<typeof window.pusher.saveSettings>
 }
@@ -45,6 +47,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(workbenchReducer, createWorkbenchState('android')),
     [saveError, setSaveError] = useState('')
   const draftsRef = useRef(drafts)
+  // 当前会话的目标选择跨路由保留；未操作过的 scope 使用启动时的持久化选择。
+  const tokenSelections = useRef<Record<string, string>>({})
   draftsRef.current = drafts
   const queue = useRef<DraftSaveQueue | null>(null)
   if (!queue.current)
@@ -110,6 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch,
         flushDrafts,
         saveError,
+        tokenSelections,
         addCredential: (c) =>
           setSnapshot((s) =>
             s ? { ...s, credentialSummaries: [...s.credentialSummaries.filter((x) => x.id !== c.id), c] } : s,

@@ -17,37 +17,40 @@ export function useWorkbench() {
     scopeResult = makeScope(snapshot.config, state.platform, state.environment, snapshot.credentialSummaries),
     scope = scopeResult.ok ? scopeResult.value : undefined,
     key = scope ? scopeKey(scope) : ''
-  const reloadTokens = async () => {
+  const currentKey = useRef(key)
+  currentKey.current = key
+  const tokenRequest = useRef(0)
+  const snapshotRef = useRef(snapshot)
+  snapshotRef.current = snapshot
+  const reloadTokens = async (restoreSelection = false) => {
+    if (currentKey.current !== key) return
+    const request = ++tokenRequest.current
     if (!scope) {
       setTokens([])
       return
     }
     const r = await client().listTokens(scope)
-    if (r.ok) setTokens(r.value)
-    else setFeedback(r.error.message)
+    if (currentKey.current !== key || request !== tokenRequest.current) return
+    if (r.ok) {
+      setTokens(r.value)
+      if (restoreSelection && stateRef.current.tokenScopeKey !== key) {
+        const selected = Object.hasOwn(app.tokenSelections.current, key)
+          ? app.tokenSelections.current[key]
+          : r.value.find((t) => t.id === snapshotRef.current.selections[key])?.token || ''
+        dispatch({ type: 'selectToken', token: selected, scopeKey: key })
+      }
+    } else setFeedback(r.error.message)
   }
   useEffect(() => {
-    let active = true
     setTokens([])
     setFeedback('')
     if (!scope) {
       if (state.tokenScopeKey) dispatch({ type: 'selectToken', token: '' })
       return
     }
-    void client()
-      .listTokens(scope)
-      .then((r) => {
-        if (!active) return
-        if (r.ok) {
-          setTokens(r.value)
-          if (stateRef.current.tokenScopeKey !== key) {
-            const selected = r.value.find((t) => t.id === snapshot.selections[key])
-            dispatch({ type: 'selectToken', token: selected?.token || '', scopeKey: key })
-          }
-        } else setFeedback(r.error.message)
-      })
+    void reloadTokens(true)
     return () => {
-      active = false
+      tokenRequest.current++
     }
   }, [key])
   useEffect(
@@ -99,14 +102,15 @@ export function useWorkbench() {
         await reloadTokens()
       } else {
         dispatch({ type: 'cancelSend' })
-        setFeedback(r.error.message)
+        if (currentKey.current === key) setFeedback(r.error.message)
       }
     } catch {
       dispatch({ type: 'cancelSend' })
-      setFeedback('本地服务未返回，请核对发送记录后再试。')
+      if (currentKey.current === key) setFeedback('本地服务未返回，请核对发送记录后再试。')
     }
   }
   const setToken = (token: string) => {
+    if (key) app.tokenSelections.current[key] = token
     dispatch({ type: 'selectToken', token, scopeKey: key })
     if (scope) {
       const record = tokens.find((t) => t.token === token)
@@ -120,19 +124,23 @@ export function useWorkbench() {
     }
     const r = await client().saveToken({ scope, token: state.token, note })
     if (r.ok) {
+      if (app.tokenSelections.current[key]?.trim() === r.value.token)
+        void client().selectToken({ scope, id: r.value.id })
+      if (currentKey.current !== key) return
       setFeedback('设备 token 已保存')
       await reloadTokens()
-      void client().selectToken({ scope, id: r.value.id })
-    } else setFeedback(r.error.message)
+    } else if (currentKey.current === key) setFeedback(r.error.message)
   }
   const deleteToken = async (id: string) => {
     if (!scope) return
     const token = tokens.find((t) => t.id === id)
     const r = await client().deleteToken({ scope, id })
     if (r.ok) {
-      if (token?.token === state.token) setToken('')
+      if (token?.token === app.tokenSelections.current[key]) app.tokenSelections.current[key] = ''
+      if (currentKey.current !== key) return
+      if (token?.token === stateRef.current.token) setToken('')
       await reloadTokens()
-    } else setFeedback(r.error.message)
+    } else if (currentKey.current === key) setFeedback(r.error.message)
   }
   const loadHistory = (receipt: SendReceipt) => {
     const platform = receipt.snapshot.scope.platform,
@@ -158,6 +166,8 @@ export function useWorkbench() {
       lastValidPayload: payload,
       advanced,
     })
+    if (newScope.ok)
+      app.tokenSelections.current[scopeKey(newScope.value)] = matches ? receipt.snapshot.token : ''
     dispatch({
       type: 'loadHistory',
       receipt,

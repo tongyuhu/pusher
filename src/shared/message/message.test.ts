@@ -135,3 +135,50 @@ it('清空高级字段恢复缺省，非法自定义数据不能使用旧的合�
   expect((value(validatePayload(d)).android as any)?.ttl).toBeUndefined()
   expect(validatePayload({ ...d, messageType: 'mixed', formStash: { dataEditorText: '{' } }).ok).toBe(false)
 })
+it('合法 JSON 是返回表单时的权威内容，旧数据框缓存不再影响展示与校验', () => {
+  let d = value(switchMessageType(createDraft('android'), 'mixed'))
+  d.formStash.dataEditorText = '{'
+  d = value(switchEditor(d, 'json'))
+  d.rawText = JSON.stringify({ notification: { title: '新通知' }, data: { key: 'new', added: 'keep' } })
+  d = value(switchEditor(d, 'form'))
+  expect(d.formStash.dataEditorText).toBeUndefined()
+  expect(d.messageType).toBe('mixed')
+  expect(value(validatePayload(d)).data).toEqual({ key: 'new', added: 'keep' })
+})
+it('JSON 新增数据后返回表单推断实际类型，恢复 iOS 暂存字段不覆盖新 JSON', () => {
+  let d = value(
+    patchForm(createDraft('ios'), { data: { order: 'old', nested: { version: 1 }, removed: 'old' } }),
+  )
+  d = value(switchMessageType(d, 'notification'))
+  d = value(switchEditor(d, 'json'))
+  d.rawText = JSON.stringify({
+    aps: { alert: { title: '新通知' } },
+    order: 'new',
+    nested: { version: 2, added: true },
+  })
+  d = value(switchEditor(d, 'form'))
+  expect(d.messageType).toBe('mixed')
+  d = value(switchMessageType(d, 'mixed'))
+  expect(JSON.parse(d.rawText)).toEqual({
+    aps: { alert: { title: '新通知' } },
+    order: 'new',
+    nested: { version: 2, added: true },
+  })
+})
+it('Android 类型往返恢复渠道和未知通知字段，当前 JSON 字段优先', () => {
+  let d = raw('android', {
+    notification: { title: '标题' },
+    android: {
+      priority: 'high',
+      notification: { channel_id: 'important', color: '#fff', extra: { keep: true } },
+    },
+  })
+  d = value(switchEditor(d, 'form'))
+  d = value(switchMessageType(d, 'data'))
+  expect((JSON.parse(d.rawText).android as any).notification).toBeUndefined()
+  d = value(switchMessageType(d, 'mixed'))
+  expect(JSON.parse(d.rawText).android).toEqual({
+    priority: 'high',
+    notification: { channel_id: 'important', color: '#fff', extra: { keep: true } },
+  })
+})

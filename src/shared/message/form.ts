@@ -103,7 +103,28 @@ export function patchForm(draft: Draft, patch: FormPatch): Result<Draft> {
 }
 export function switchEditor(draft: Draft, mode: 'form' | 'json'): Result<Draft> {
   const p = parsePayload(draft.rawText)
-  return p.ok ? ok({ ...updated(draft, p.value), mode }) : p
+  if (!p.ok) return p
+  if (draft.mode === mode) return ok(draft)
+  let stash = { ...draft.formStash }
+  let messageType = draft.messageType
+  if (mode === 'json') stash.jsonBaseline = JSON.stringify(p.value)
+  else {
+    // JSON 改动后，旧的隐藏字段不应重新复活已删除或改写的内容。
+    if (stash.jsonBaseline !== JSON.stringify(p.value)) stash = {}
+    delete stash.jsonBaseline
+    delete stash.dataEditorText
+    const aps = isObject(p.value.aps) ? p.value.aps : {}
+    const notification =
+      draft.platform === 'android'
+        ? p.value.notification !== undefined
+        : ['alert', 'sound', 'badge'].some((key) => aps[key] !== undefined)
+    const data =
+      draft.platform === 'android'
+        ? p.value.data !== undefined
+        : Object.keys(p.value).some((key) => key !== 'aps')
+    messageType = notification ? (data ? 'mixed' : 'notification') : 'data'
+  }
+  return ok({ ...updated(draft, p.value), mode, messageType, formStash: stash })
 }
 export function switchMessageType(draft: Draft, type: Draft['messageType']): Result<Draft> {
   const parsed = parsePayload(draft.rawText)
@@ -120,8 +141,18 @@ export function switchMessageType(draft: Draft, type: Draft['messageType']): Res
         delete p.android.notification
         if (!Object.keys(p.android).length) delete p.android
       }
-    } else if (!p.notification)
-      p.notification = stash.notification || { title: '推送测试', body: '这是一条测试消息' }
+    } else {
+      if (!p.notification)
+        p.notification = stash.notification || { title: '推送测试', body: '这是一条测试消息' }
+      if (isObject(stash.androidNotification)) {
+        const android = isObject(p.android) ? p.android : {}
+        android.notification = {
+          ...stash.androidNotification,
+          ...(isObject(android.notification) ? android.notification : {}),
+        }
+        p.android = android
+      }
+    }
     if (type === 'notification') {
       if (p.data) stash.data = p.data
       delete p.data
@@ -138,7 +169,8 @@ export function switchMessageType(draft: Draft, type: Draft['messageType']): Res
     } else {
       delete aps['content-available']
       aps.alert = aps.alert || stash.alert || { title: '推送测试', body: '这是一条测试消息' }
-      for (const key of ['sound', 'badge']) if (stash[key] !== undefined) aps[key] = stash[key]
+      for (const key of ['sound', 'badge'])
+        if (aps[key] === undefined && stash[key] !== undefined) aps[key] = stash[key]
       delete advanced.priority
     }
     if (type === 'notification') {
@@ -149,7 +181,8 @@ export function switchMessageType(draft: Draft, type: Draft['messageType']): Res
           delete p[key]
         }
       stash.data = data
-    } else if (isObject(stash.data)) Object.assign(p, stash.data)
+    } else if (isObject(stash.data))
+      for (const [key, value] of Object.entries(stash.data)) if (!Object.hasOwn(p, key)) p[key] = value
     p.aps = aps
   }
   return ok({ ...updated(draft, p, advanced), messageType: type, formStash: stash })
