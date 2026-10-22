@@ -10,6 +10,11 @@ import { ConfigService } from './config/service'
 import { TokenService } from './tokens/service'
 import { registerIpc } from './ipc'
 import { installShutdownFlush } from './lifecycle'
+import { HistoryService } from './history/service'
+import { SendCoordinator } from './send/coordinator'
+import { FcmAdapter } from './push/fcm/adapter'
+import { ApnsAdapter } from './push/apns/adapter'
+import { channel } from '../shared/channels'
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 const requestedData=app.commandLine.getSwitchValue('user-data-dir')
 if(requestedData)app.setPath('userData',path.resolve(requestedData))
@@ -22,7 +27,13 @@ const window = createMainWindow()
 const store=new StateStore(app.getPath('userData'),electronCrypto)
 const configService=new ConfigService(store,async(kind)=>{const file=await dialog.showOpenDialog(window,{title:'导入推送凭据',properties:['openFile'],filters:[{name:'推送凭据',extensions:[kind==='fcm'?'json':kind==='apns-p8'?'p8':'p12']}]});if(file.canceled||!file.filePaths[0])return null;return {fileName:path.basename(file.filePaths[0]),bytes:await readFile(file.filePaths[0])}})
 await configService.cleanupUnreferenced().catch(()=>{})
-registerIpc({window,ipcMain,store,configService,tokenService:new TokenService(store),allowedOrigin:rendererUrl()||'app://pusher'})
+const tokenService=new TokenService(store),history=new HistoryService(store),fcm=new FcmAdapter(),apns=new ApnsAdapter()
+await history.recoverInterrupted().catch(()=>{})
+const coordinator=new SendCoordinator({store,configService,history,tokenService,adapters:{android:fcm,ios:apns}})
+configService.onInvalidate=async id=>{await Promise.all([fcm.invalidate(id),apns.invalidate(id)])}
+coordinator.onUpdate(receipt=>{if(!window.isDestroyed())window.webContents.send(channel('sendUpdate'),receipt)})
+registerIpc({window,ipcMain,store,configService,tokenService,send:input=>coordinator.send(input),allowedOrigin:rendererUrl()||'app://pusher'})
+app.on('before-quit',()=>{void apns.close()})
 installShutdownFlush(app,()=>store.flush(),()=>{window.show();dialog.showErrorBox('保存未完成','本地数据保存失败，请检查系统加密状态和文件权限后重试关闭。')})
 app.on('window-all-closed', () => app.quit())
 
